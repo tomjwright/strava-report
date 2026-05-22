@@ -31,9 +31,13 @@ st.config.set_option('theme.font', 'sans serif')
 
 
 # Configuration
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8003")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8004")
+API_GOLD_ACTIVITIES_URL = f"{API_BASE_URL}/api/gold-activities"
+API_DAILY_SUMMARY_URL = f"{API_BASE_URL}/api/daily-summary"
 API_BRONZE_ACTIVITIES_URL = f"{API_BASE_URL}/api/bronze-activities"
 API_FETCH_STRAVA_URL = f"{API_BASE_URL}/api/fetch-strava"
+API_TRANSFORM_SILVER_URL = f"{API_BASE_URL}/api/transform-silver"
+API_RUN_PIPELINE_URL = f"{API_BASE_URL}/api/run-etl-pipeline"
 
 # Professional color scheme
 COLORS = {
@@ -47,6 +51,31 @@ COLORS = {
     'text': '#FAFAFA',
     'text_secondary': '#8B949E'
 }
+
+def fetch_gold_activities(limit: int = 100) -> List[Dict[str, Any]]:
+    """Fetch structured activities from the gold layer (dimensional model)."""
+    try:
+        st.info(f"Fetching activities from Gold layer at {API_GOLD_ACTIVITIES_URL}")
+        response = requests.get(f"{API_GOLD_ACTIVITIES_URL}?limit={limit}", timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        activities = data.get("data", [])
+        st.success(f"Successfully fetched {len(activities)} gold activities")
+        return activities
+    except requests.exceptions.ConnectionError:
+        st.error(f"Cannot connect to API at {API_BASE_URL}. Make sure the backend is running.")
+        return []
+    except Exception as e:
+        st.error(f"Error fetching gold activities: {e}")
+        import traceback
+        st.error(traceback.format_exc())
+        return []
+
+
+def fetch_activities(limit: int = 100) -> List[Dict[str, Any]]:
+    """Fetch structured activities from the gold layer API."""
+    return fetch_gold_activities(limit=limit)
+
 
 def fetch_bronze_activities(limit: int = 100) -> List[Dict[str, Any]]:
     """Fetch raw activities from the bronze layer API."""
@@ -117,24 +146,32 @@ def format_speed(mps: Optional[float]) -> str:
     return f"{kmh:.1f} km/h"
 
 
-def extract_activity_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract relevant activity data from raw Strava data."""
+def extract_activity_data(gold_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract relevant activity data from gold layer (dimensional model)."""
+    # Gold layer already has calculated metrics, so we just map the fields
+    activity_id = gold_data.get("activity_id") or gold_data.get("id")
+    
     return {
-        "id": raw_data.get("id"),
-        "name": raw_data.get("name", "Untitled"),
-        "type": raw_data.get("type", "Unknown"),
-        "sport_type": raw_data.get("sport_type", "Unknown"),
-        "distance": raw_data.get("distance", 0),
-        "moving_time": raw_data.get("moving_time", 0),
-        "elapsed_time": raw_data.get("elapsed_time", 0),
-        "total_elevation_gain": raw_data.get("total_elevation_gain", 0),
-        "average_speed": raw_data.get("average_speed", 0),
-        "max_speed": raw_data.get("max_speed", 0),
-        "start_date": raw_data.get("start_date", ""),
-        "start_date_local": raw_data.get("start_date_local", ""),
-        "achievement_count": raw_data.get("achievement_count", 0),
-        "kudos_count": raw_data.get("kudos_count", 0),
-        "comment_count": raw_data.get("comment_count", 0),
+        "id": activity_id,
+        "name": gold_data.get("activity_name", "Untitled"),
+        "type": gold_data.get("sport_type", "Unknown"),
+        "sport_type": gold_data.get("sport_type", "Unknown"),
+        "distance": gold_data.get("distance_km", 0) * 1000 if gold_data.get("distance_km") else gold_data.get("distance_m", 0),  # Convert to meters for consistency
+        "moving_time": gold_data.get("duration_seconds", 0),
+        "elapsed_time": gold_data.get("duration_seconds", 0),  # Gold layer doesn't have elapsed_time
+        "total_elevation_gain": gold_data.get("elevation_gain_m", 0),
+        "average_speed": gold_data.get("average_speed_kmh", 0) / 3.6 if gold_data.get("average_speed_kmh") else gold_data.get("average_speed_mps", 0),  # Convert to m/s for consistency
+        "max_speed": gold_data.get("max_speed_kmh", 0) / 3.6 if gold_data.get("max_speed_kmh") else gold_data.get("max_speed_mps", 0),  # Convert to m/s for consistency
+        "start_date": gold_data.get("start_date", ""),
+        "start_date_local": gold_data.get("start_date_local", ""),
+        "achievement_count": gold_data.get("achievement_count", 0),
+        "kudos_count": gold_data.get("kudos_count", 0),
+        "comment_count": gold_data.get("comment_count", 0),
+        # Add gold layer calculated metrics for dashboard
+        "distance_km": gold_data.get("distance_km", 0),
+        "duration_hours": gold_data.get("duration_hours", 0),
+        "average_speed_kmh": gold_data.get("average_speed_kmh", 0),
+        "average_pace_min_km": gold_data.get("average_pace_min_km", 0),
     }
 
 
@@ -599,6 +636,42 @@ def main():
     # Data limit selector
     limit = st.sidebar.slider("Activities to load", min_value=10, max_value=1000, value=100, step=50)
     
+    # ETL Pipeline controls
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🏗️ ETL Pipeline")
+    
+    if st.sidebar.button("▶️ Run Complete ETL Pipeline", help="Run Bronze → Silver → Gold pipeline"):
+        with st.spinner("Running ETL pipeline..."):
+            try:
+                response = requests.post(f"{API_RUN_PIPELINE_URL}?bronze_limit=200&silver_limit=200&gold_limit=200&incremental=true", timeout=120)
+                response.raise_for_status()
+                result = response.json()
+                
+                if result['status'] == 'success':
+                    st.sidebar.success("✅ ETL pipeline completed successfully")
+                    st.sidebar.info(f"Bronze: {result['details']['bronze']['ingested']} activities")
+                    st.sidebar.info(f"Silver: {result['details']['silver']['transformed']} activities")
+                    st.sidebar.info(f"Gold: {result['details']['gold']['transformed']} activities")
+                else:
+                    st.sidebar.error(f"❌ ETL pipeline failed: {result.get('message', 'Unknown error')}")
+                    
+            except Exception as e:
+                st.sidebar.error(f"Error running ETL pipeline: {e}")
+    
+    if st.sidebar.button("🏥 Health Check", help="Check ETL pipeline component health"):
+        try:
+            response = requests.get(f"{API_BASE_URL}/api/etl-health", timeout=10)
+            response.raise_for_status()
+            health = response.json()
+            
+            st.sidebar.markdown("### Health Status:")
+            st.sidebar.info(f"Database: {'✅' if health['health_check']['database'] else '❌'}")
+            st.sidebar.info(f"Strava API: {'✅' if health['health_check']['strava_api'] else '❌'}")
+            st.sidebar.info(f"Overall: {health['health_check']['overall_status'].upper()}")
+            
+        except Exception as e:
+            st.sidebar.error(f"Health check failed: {e}")
+    
     st.sidebar.markdown("---")
     
     # Manual refresh button
@@ -616,18 +689,18 @@ def main():
             st.sidebar.error(f"❌ Backend Error: {health_response.status_code}")
     except:
         st.sidebar.error(f"❌ Backend Unreachable at {API_BASE_URL}")
-        st.sidebar.warning("Make sure the backend is running on port 8003")
+        st.sidebar.warning("Make sure the backend is running on port 8004")
     
     # Fetch data
-    with st.spinner("🔄 Loading activities from database..."):
-        activities = fetch_bronze_activities(limit=limit)
+    with st.spinner("🔄 Loading activities from Gold layer..."):
+        activities = fetch_activities(limit=limit)
     
     if not activities:
         st.markdown("""
         <div style='background: #21262D; padding: 2rem; border-radius: 12px; border: 1px solid #30363D; text-align: center; margin: 2rem 0;'>
             <div style='font-size: 3rem; margin-bottom: 1rem;'>📭</div>
             <h3 style='color: #FAFAFA; margin: 0 0 0.5rem 0;'>No Activities Found</h3>
-            <p style='color: #8B949E; margin: 0;'>Click "Sync with Strava" in the sidebar to fetch your activities.</p>
+            <p style='color: #8B949E; margin: 0;'>Click "Run Complete ETL Pipeline" in the sidebar to fetch and process your Strava data.</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -641,9 +714,10 @@ def main():
         
         return
     
-    # Extract activity data from raw data
+    # Extract activity data from gold layer (dimensional model)
     try:
-        extracted_data = [extract_activity_data(activity["raw_data"]) for activity in activities]
+        # Gold layer data is already structured with business metrics
+        extracted_data = [extract_activity_data(activity) for activity in activities]
         df = pl.DataFrame(extracted_data)
         
         st.success(f"📊 Loaded {len(df)} activities into dashboard")

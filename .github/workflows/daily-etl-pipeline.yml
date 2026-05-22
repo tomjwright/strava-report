@@ -1,0 +1,112 @@
+name: Daily ETL Pipeline
+
+on:
+  schedule:
+    # Run every day at 6:00 AM UTC (2:00 PM Singapore time)
+    - cron: '0 6 * * *'
+  workflow_dispatch:  # Allow manual trigger
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  etl-pipeline:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+    
+    - name: Run ETL Pipeline
+      env:
+        STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+        STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+        STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      run: |
+        cd backend
+        python -c "
+        from app.etl.orchestrator import run_full_etl_pipeline
+        import os
+        from dotenv import load_dotenv
+        
+        # Load environment variables
+        load_dotenv()
+        
+        # Run the complete ETL pipeline
+        result = run_full_etl_pipeline(
+            bronze_limit=200,  # Fetch up to 200 recent activities
+            silver_limit=200,
+            gold_limit=200,
+            incremental=True
+        )
+        
+        print('ETL Pipeline Results:')
+        print(f'  Bronze: {result[\"bronze\"][\"ingested\"]} activities')
+        print(f'  Silver: {result[\"silver\"][\"transformed\"]} activities')
+        print(f'  Gold: {result[\"gold\"][\"transformed\"]} activities')
+        print(f'  Status: {result[\"overall_status\"]}')
+        
+        if result['overall_status'] != 'success':
+            raise Exception(f'ETL pipeline failed with status: {result[\"overall_status\"]}')
+        "
+    
+    - name: Health Check
+      env:
+        STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+        STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+        STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      run: |
+        cd backend
+        python -c "
+        from app.etl.orchestrator import run_health_check
+        from dotenv import load_dotenv
+        
+        load_dotenv()
+        
+        health = run_health_check()
+        print('Health Check Results:')
+        print(f'  Database: {health[\"database\"]}')
+        print(f'  Strava API: {health[\"strava_api\"]}')
+        print(f'  Overall Status: {health[\"overall_status\"]}')
+        
+        if health['overall_status'] == 'unhealthy':
+            raise Exception('System health check failed')
+        "
+    
+    - name: Notify on failure
+      if: failure()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: 'ETL Pipeline Failed',
+            body: `The daily ETL pipeline failed on ${new Date().toISOString()}.
+            
+            Workflow: ${context.workflow}
+            Run: ${context.runNumber}
+            Commit: ${context.sha}
+            
+            Please check the logs for details.`
+          })

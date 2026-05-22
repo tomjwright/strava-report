@@ -19,7 +19,7 @@ class SupabaseDatabase:
         """Insert activity into bronze_activities table."""
         try:
             response = self.client.table('bronze_activities').insert({
-                'strava_id': activity_data['id'],
+                'activity_id': activity_data['id'],
                 'raw_data': activity_data,
             }).execute()
             return response

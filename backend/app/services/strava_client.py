@@ -179,94 +179,37 @@ class StravaClient:
             
         Returns:
             List of all activities
+            
+        Raises:
+            Exception: If Strava API request fails
         """
         # Default to 2026 onwards if no after parameter provided
         if after is None:
             after = self.DEFAULT_AFTER_TIMESTAMP
-            logger.info(f"Defaulting to activities from 2026 onwards (after={after})")
+            logger.info(f"Fetching activities from 2026 onwards (after={after})")
         
-        # Try to fetch from Strava API, fall back to mock data if it fails
-        try:
-            all_activities = []
-            page = 1
+        all_activities = []
+        page = 1
+        
+        while True:
+            activities = self.get_activities(per_page=200, page=page, after=after, before=before)
             
-            while True:
-                activities = self.get_activities(per_page=200, page=page, after=after, before=before)
-                
-                if not activities:
-                    break
-                
-                all_activities.extend(activities)
-                
-                if max_activities and len(all_activities) >= max_activities:
-                    all_activities = all_activities[:max_activities]
-                    break
-                
-                page += 1
-                logger.info(f"Fetched {len(all_activities)} activities so far")
+            if not activities:
+                break
             
-            logger.info(f"Total activities fetched: {len(all_activities)}")
-            return all_activities
+            all_activities.extend(activities)
             
-        except Exception as e:
-            logger.warning(f"Failed to fetch from Strava API: {e}")
-            logger.info("Using mock data for demonstration")
-            return self._get_mock_activities(max_activities or 5)
+            if max_activities and len(all_activities) >= max_activities:
+                all_activities = all_activities[:max_activities]
+                break
+            
+            page += 1
+            logger.info(f"Fetched {len(all_activities)} activities so far")
+        
+        logger.info(f"Total activities fetched from Strava: {len(all_activities)}")
+        return all_activities
     
-    def _get_mock_activities(self, count: int) -> List[Dict[str, Any]]:
-        """Generate mock activities from 2026 onwards for demonstration.
-        
-        Args:
-            count: Number of mock activities to generate
-            
-        Returns:
-            List of mock activity data
-        """
-        mock_activities = []
-        activity_types = [
-            {"type": "Run", "sport_type": "Running", "distance": 5000.0, "moving_time": 1800},
-            {"type": "Ride", "sport_type": "Cycling", "distance": 15000.0, "moving_time": 2400},
-            {"type": "Swim", "sport_type": "Swimming", "distance": 1000.0, "moving_time": 1200},
-            {"type": "WeightTraining", "sport_type": "Strength", "distance": 0, "moving_time": 2700},
-        ]
-        
-        base_date = datetime.datetime(2026, 1, 15)
-        
-        for i in range(count):
-            activity_template = activity_types[i % len(activity_types)]
-            activity_date = base_date + datetime.timedelta(days=i * 2)
-            
-            mock_activity = {
-                "id": 1000000 + i,
-                "name": f"Mock {activity_template['type']} #{i+1}",
-                "type": activity_template["type"],
-                "sport_type": activity_template["sport_type"],
-                "distance": activity_template["distance"],
-                "moving_time": activity_template["moving_time"],
-                "elapsed_time": activity_template["moving_time"] + 300,
-                "total_elevation_gain": 50.0 if activity_template["type"] in ["Run", "Ride"] else 0,
-                "average_speed": activity_template["distance"] / activity_template["moving_time"] if activity_template["distance"] > 0 else 0,
-                "max_speed": activity_template["distance"] / activity_template["moving_time"] * 1.5 if activity_template["distance"] > 0 else 0,
-                "start_date": activity_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "start_date_local": activity_date.strftime("%Y-%m-%dT%H:%M:%S"),
-                "timezone": "UTC",
-                "achievement_count": i + 1,
-                "kudos_count": (i + 1) * 3,
-                "comment_count": i // 2,
-                "athlete_count": 0,
-                "photo_count": i % 3,
-                "trainer": False,
-                "commute": False,
-                "manual": False,
-                "private": False,
-                "flagged": False,
-            }
-            
-            mock_activities.append(mock_activity)
-        
-        logger.info(f"Generated {len(mock_activities)} mock activities from 2026")
-        return mock_activities
-    
+
     def get_athlete(self) -> Dict[str, Any]:
         """Get athlete profile information.
         
