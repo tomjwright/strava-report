@@ -221,6 +221,10 @@ def create_professional_line_chart(df: pl.DataFrame, x_col: str, y_col: str, tit
     """Create a professional line chart with custom styling."""
     fig = go.Figure()
     
+    # Convert hex to RGBA for proper fill effect
+    hex_color = color.lstrip('#')
+    rgba_color = f'rgba({int(hex_color[0:2], 16)}, {int(hex_color[2:4], 16)}, {int(hex_color[4:6], 16)}, 0.2)'
+    
     fig.add_trace(go.Scatter(
         x=df[x_col],
         y=df[y_col],
@@ -232,7 +236,7 @@ def create_professional_line_chart(df: pl.DataFrame, x_col: str, y_col: str, tit
             line=dict(color=COLORS['surface'], width=2)
         ),
         fill='tozeroy',
-        fillcolor=f'{color}33'
+        fillcolor=rgba_color
     ))
     
     fig.update_layout(
