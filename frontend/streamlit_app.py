@@ -605,6 +605,19 @@ def main():
     if st.sidebar.button("🔄 Refresh Data", use_container_width=True):
         st.rerun()
     
+    st.sidebar.markdown("---")
+    
+    # Show API status
+    try:
+        health_response = requests.get(f"{API_BASE_URL}/health", timeout=3)
+        if health_response.status_code == 200:
+            st.sidebar.success("✅ Backend Connected")
+        else:
+            st.sidebar.error(f"❌ Backend Error: {health_response.status_code}")
+    except:
+        st.sidebar.error(f"❌ Backend Unreachable at {API_BASE_URL}")
+        st.sidebar.warning("Make sure the backend is running on port 8003")
+    
     # Fetch data
     with st.spinner("🔄 Loading activities from database..."):
         activities = fetch_bronze_activities(limit=limit)
@@ -623,8 +636,8 @@ def main():
         try:
             health_response = requests.get(f"{API_BASE_URL}/health", timeout=5)
             st.json(health_response.json())
-        except:
-            st.error(f"Cannot connect to API at {API_BASE_URL}")
+        except Exception as e:
+            st.error(f"Cannot connect to API at {API_BASE_URL}: {e}")
         
         return
     
@@ -633,19 +646,54 @@ def main():
         extracted_data = [extract_activity_data(activity["raw_data"]) for activity in activities]
         df = pl.DataFrame(extracted_data)
         
-        st.info(f"📊 Loaded {len(df)} activities into dashboard")
+        st.success(f"📊 Loaded {len(df)} activities into dashboard")
+        
+        # Show sample of loaded data for debugging
+        with st.expander("🔍 Debug: Show Raw Data Sample", expanded=False):
+            st.json(extracted_data[:1] if extracted_data else [])
+            
     except Exception as e:
         st.error(f"Error processing activity data: {e}")
         import traceback
         st.error(traceback.format_exc())
+        st.info("This might be a data format issue. Check the raw data format.")
         return
     
-    # Render dashboard sections
-    render_metrics(df)
-    render_activity_breakdown(df)
-    render_timeline(df)
-    render_activity_table(df)
-    render_recent_activities(df)
+    # Render dashboard sections with error handling
+    try:
+        render_metrics(df)
+    except Exception as e:
+        st.error(f"Metrics error: {e}")
+        import traceback
+        st.error(traceback.format_exc())
+    
+    try:
+        render_activity_breakdown(df)
+    except Exception as e:
+        st.error(f"Activity breakdown error: {e}")
+        import traceback
+        st.error(traceback.format_exc())
+    
+    try:
+        render_timeline(df)
+    except Exception as e:
+        st.error(f"Timeline error: {e}")
+        import traceback
+        st.error(traceback.format_exc())
+    
+    try:
+        render_activity_table(df)
+    except Exception as e:
+        st.error(f"Activity table error: {e}")
+        import traceback
+        st.error(traceback.format_exc())
+    
+    try:
+        render_recent_activities(df)
+    except Exception as e:
+        st.error(f"Recent activities error: {e}")
+        import traceback
+        st.error(traceback.format_exc())
     
     # Footer with last update time
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
