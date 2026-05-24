@@ -1,0 +1,15 @@
+# Ignore Python files for Vercel detection
+*.py
+*.pyc
+__pycache__/
+venv/
+.venv/
+simple_backend.py
+simple_data_loader.py
+auto_loader.py
+clean_dashboard.py
+start_all.bat
+start_auto_loader.bat
+requirements.txt
+tests/
+.pytest_cache/

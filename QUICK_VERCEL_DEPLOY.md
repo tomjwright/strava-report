@@ -23,10 +23,20 @@ Visit [vercel.com](https://vercel.com) and login/signup
 - Select: `tomjwright/strava-report`
 - Click "Import"
 
-### 3. Configure Project
-Vercel will auto-detect Next.js settings. Just make sure:
-- **Root Directory**: `frontend`
-- Everything else can stay as default
+### 3. Configure Project (IMPORTANT!)
+Vercel should now detect Next.js correctly. Make sure:
+- **Root Directory**: `frontend` (CRITICAL - this fixes the detection issue!)
+- **Framework Preset**: Next.js
+- **Build Command**: `npm run build`
+- **Output Directory**: `.next`
+- **Install Command**: `npm install`
+
+**Note**: I've fixed the Vercel detection issue by:
+- Moving `vercel.json` to the `frontend/` directory
+- Adding `.vercelignore` to ignore Python files
+- Configuring proper Next.js detection
+
+If Vercel still detects incorrectly, manually set the framework to "Next.js" and ensure root directory is `frontend`.
 
 ### 4. Add Environment Variables
 In Vercel project settings:
