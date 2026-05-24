@@ -30,8 +30,9 @@ venv/
 env/
 ENV/
 
-# Streamlit
-.streamlit/
+# Streamlit (but keep config)
+.streamlit/*
+!.streamlit/config.toml
 
 # IDE
 .vscode/
