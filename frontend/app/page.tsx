@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react'
 import { supabase, StravaActivity } from '@/lib/supabase'
 import { Activity, BarChart3, Clock, Mountain, TrendingUp } from 'lucide-react'
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, PieChart, Pie, Cell
+} from 'recharts'
 
 export default function Dashboard() {
   const [activities, setActivities] = useState<StravaActivity[]>([])
@@ -93,9 +97,15 @@ export default function Dashboard() {
         </div>
 
         {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <DistanceChart activities={activities} />
           <TimeChart activities={activities} />
+        </div>
+
+        {/* Activity Type Distribution */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ActivityTypePieChart activities={activities} />
+          <WeeklyActivityChart activities={activities} />
         </div>
       </div>
     </div>
@@ -160,19 +170,137 @@ function RecentActivitiesCard({ activities }: { activities: StravaActivity[] }) 
 }
 
 function DistanceChart({ activities }: { activities: StravaActivity[] }) {
+  // Prepare data for chart - group by date
+  const chartData = activities
+    .slice(0, 20)
+    .reverse()
+    .map(activity => ({
+      date: formatDate(activity.start_date),
+      distance: parseFloat((activity.distance / 1000).toFixed(2)),
+      type: activity.type
+    }))
+
   return (
     <div className="bg-card border border-border rounded-lg p-6">
-      <h3 className="text-xl font-bold mb-4">Distance Over Time</h3>
-      <p className="text-gray-400">Chart implementation pending</p>
+      <h3 className="text-xl font-bold mb-4">Distance Over Time (Last 20 Activities)</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+          <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
+          <YAxis stroke="#94a3b8" fontSize={12} />
+          <Tooltip 
+            contentStyle={{ backgroundColor: '#1e293b', border: '#334155', borderRadius: '8px' }}
+            itemStyle={{ color: '#f8fafc' }}
+          />
+          <Bar dataKey="distance" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   )
 }
 
 function TimeChart({ activities }: { activities: StravaActivity[] }) {
+  // Prepare data for chart - group by date
+  const chartData = activities
+    .slice(0, 20)
+    .reverse()
+    .map(activity => ({
+      date: formatDate(activity.start_date),
+      time: parseFloat((activity.moving_time / 60).toFixed(0)),
+      type: activity.type
+    }))
+
   return (
     <div className="bg-card border border-border rounded-lg p-6">
-      <h3 className="text-xl font-bold mb-4">Time Distribution</h3>
-      <p className="text-gray-400">Chart implementation pending</p>
+      <h3 className="text-xl font-bold mb-4">Time Distribution (Last 20 Activities)</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+          <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
+          <YAxis stroke="#94a3b8" fontSize={12} />
+          <Tooltip 
+            contentStyle={{ backgroundColor: '#1e293b', border: '#334155', borderRadius: '8px' }}
+            itemStyle={{ color: '#f8fafc' }}
+          />
+          <Line type="monotone" dataKey="time" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981' }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+function ActivityTypePieChart({ activities }: { activities: StravaActivity[] }) {
+  const activityTypes = activities.reduce((acc, activity) => {
+    acc[activity.type] = (acc[activity.type] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  const data = Object.entries(activityTypes).map(([type, count]) => ({
+    name: type,
+    value: count
+  }))
+
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-6">
+      <h3 className="text-xl font-bold mb-4">Activity Type Distribution</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            labelLine={false}
+            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+            outerRadius={80}
+            fill="#8884d8"
+            dataKey="value"
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip 
+            contentStyle={{ backgroundColor: '#1e293b', border: '#334155', borderRadius: '8px' }}
+            itemStyle={{ color: '#f8fafc' }}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+function WeeklyActivityChart({ activities }: { activities: StravaActivity[] }) {
+  // Group activities by day of week
+  const dayCounts = [0, 0, 0, 0, 0, 0, 0] // Sun-Sat
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  activities.forEach(activity => {
+    const day = new Date(activity.start_date).getDay()
+    dayCounts[day]++
+  })
+
+  const data = dayNames.map((day, index) => ({
+    day,
+    activities: dayCounts[index]
+  }))
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-6">
+      <h3 className="text-xl font-bold mb-4">Activity by Day of Week</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+          <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} />
+          <YAxis stroke="#94a3b8" fontSize={12} />
+          <Tooltip 
+            contentStyle={{ backgroundColor: '#1e293b', border: '#334155', borderRadius: '8px' }}
+            itemStyle={{ color: '#f8fafc' }}
+          />
+          <Bar dataKey="activities" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   )
 }
@@ -195,7 +323,6 @@ function formatTime(seconds: number): string {
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
     month: 'short',
-    day: 'numeric',
-    year: 'numeric'
+    day: 'numeric'
   })
 }
