@@ -1,19 +1,28 @@
 -- Gold Layer Schema - Dimensional Model for Strava Activity Analytics
--- This script creates the dimensional model tables
+-- This script creates the dimensional model tables organized by schemas
+
+-- Create schemas for medallion architecture
+CREATE SCHEMA IF NOT EXISTS bronze;
+CREATE SCHEMA IF NOT EXISTS silver;
+CREATE SCHEMA IF NOT EXISTS gold;
+
+-- Grant permissions (adjust as needed for your security requirements)
+GRANT USAGE ON SCHEMA bronze, silver, gold TO public;
+GRANT ALL ON SCHEMA bronze, silver, gold TO postgres;
 
 -- Drop existing tables if they exist (for clean slate)
-DROP TABLE IF EXISTS fact_daily_summary CASCADE;
-DROP TABLE IF EXISTS fact_activities CASCADE;
-DROP TABLE IF EXISTS dim_date CASCADE;
-DROP TABLE IF EXISTS dim_activity_type CASCADE;
+DROP TABLE IF EXISTS gold.fact_daily_summary CASCADE;
+DROP TABLE IF EXISTS gold.fact_activities CASCADE;
+DROP TABLE IF EXISTS gold.dim_date CASCADE;
+DROP TABLE IF EXISTS gold.dim_activity_type CASCADE;
 
 -- Drop existing intermediate tables
-DROP TABLE IF EXISTS silver_activities CASCADE;
-DROP TABLE IF EXISTS bronze_activities CASCADE;
-DROP TABLE IF EXISTS activities CASCADE;
+DROP TABLE IF EXISTS silver.silver_activities CASCADE;
+DROP TABLE IF EXISTS bronze.bronze_activities CASCADE;
+DROP TABLE IF EXISTS public.activities CASCADE;
 
 -- Bronze Layer: Raw Strava data
-CREATE TABLE bronze_activities (
+CREATE TABLE bronze.bronze_activities (
     id SERIAL PRIMARY KEY,
     activity_id BIGINT NOT NULL UNIQUE,
     raw_data JSONB NOT NULL,
@@ -21,11 +30,11 @@ CREATE TABLE bronze_activities (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_bronze_activities_activity_id ON bronze_activities(activity_id);
-CREATE INDEX idx_bronze_activities_ingested_at ON bronze_activities(ingested_at);
+CREATE INDEX idx_bronze_activities_activity_id ON bronze.bronze_activities(activity_id);
+CREATE INDEX idx_bronze_activities_ingested_at ON bronze.bronze_activities(ingested_at);
 
 -- Silver Layer: Cleaned and validated data
-CREATE TABLE silver_activities (
+CREATE TABLE silver.silver_activities (
     id SERIAL PRIMARY KEY,
     activity_id BIGINT NOT NULL UNIQUE,
     activity_name VARCHAR(255),
@@ -54,12 +63,13 @@ CREATE TABLE silver_activities (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_silver_activities_activity_id ON silver_activities(activity_id);
-CREATE INDEX idx_silver_activities_type ON silver_activities(type);
-CREATE INDEX idx_silver_activities_start_date ON silver_activities(start_date);
+CREATE INDEX idx_silver_activities_activity_id ON silver.silver_activities(activity_id);
+CREATE INDEX idx_silver_activities_type ON silver.silver_activities(type);
+CREATE INDEX idx_silver_activities_start_date ON silver.silver_activities(start_date);
 
+-- Gold Layer: Dimensional Model
 -- Dimension Table: dim_activity_type
-CREATE TABLE dim_activity_type (
+CREATE TABLE gold.dim_activity_type (
     activity_type_id SERIAL PRIMARY KEY,
     type_name VARCHAR(100) UNIQUE NOT NULL,
     sport_type VARCHAR(100),
@@ -72,7 +82,7 @@ CREATE TABLE dim_activity_type (
 );
 
 -- Pre-populate with common activity types
-INSERT INTO dim_activity_type (type_name, sport_type, category, is_distance_based, unit_of_measure, description) VALUES
+INSERT INTO gold.dim_activity_type (type_name, sport_type, category, is_distance_based, unit_of_measure, description) VALUES
 ('Run', 'Running', 'Endurance', TRUE, 'km', 'Running activities'),
 ('Ride', 'Cycling', 'Endurance', TRUE, 'km', 'Cycling activities'),
 ('Swim', 'Swimming', 'Endurance', TRUE, 'm', 'Swimming activities'),
@@ -84,7 +94,7 @@ INSERT INTO dim_activity_type (type_name, sport_type, category, is_distance_base
 ON CONFLICT (type_name) DO NOTHING;
 
 -- Dimension Table: dim_date
-CREATE TABLE dim_date (
+CREATE TABLE gold.dim_date (
     date_id INTEGER PRIMARY KEY,
     date_actual DATE UNIQUE NOT NULL,
     day_of_week INTEGER,
@@ -107,18 +117,18 @@ CREATE TABLE dim_date (
 );
 
 -- Create indexes for dim_date
-CREATE INDEX idx_dim_date_date_actual ON dim_date(date_actual);
-CREATE INDEX idx_dim_date_year_month ON dim_date(year_month);
-CREATE INDEX idx_dim_date_quarter ON dim_date(quarter);
+CREATE INDEX idx_dim_date_date_actual ON gold.dim_date(date_actual);
+CREATE INDEX idx_dim_date_year_month ON gold.dim_date(year_month);
+CREATE INDEX idx_dim_date_quarter ON gold.dim_date(quarter);
 
 -- Function to populate dim_date
-CREATE OR REPLACE FUNCTION populate_dim_date(start_date DATE, end_date DATE)
+CREATE OR REPLACE FUNCTION gold.populate_dim_date(start_date DATE, end_date DATE)
 RETURNS VOID AS $$
 DECLARE
     loop_date DATE := start_date;
 BEGIN
     WHILE loop_date <= end_date LOOP
-        INSERT INTO dim_date (
+        INSERT INTO gold.dim_date (
             date_id,
             date_actual,
             day_of_week,
@@ -170,10 +180,10 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Populate dim_date for 2026 (can be expanded as needed)
-SELECT populate_dim_date('2026-01-01'::DATE, '2026-12-31'::DATE);
+SELECT gold.populate_dim_date('2026-01-01'::DATE, '2026-12-31'::DATE);
 
 -- Fact Table: fact_activities
-CREATE TABLE fact_activities (
+CREATE TABLE gold.fact_activities (
     fact_id BIGSERIAL PRIMARY KEY,
     activity_id BIGINT NOT NULL,
     
@@ -223,19 +233,19 @@ CREATE TABLE fact_activities (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
     -- Constraints
-    CONSTRAINT fk_activities_type FOREIGN KEY (activity_type_id) REFERENCES dim_activity_type(activity_type_id),
-    CONSTRAINT fk_activities_date FOREIGN KEY (date_id) REFERENCES dim_date(date_id),
+    CONSTRAINT fk_activities_type FOREIGN KEY (activity_type_id) REFERENCES gold.dim_activity_type(activity_type_id),
+    CONSTRAINT fk_activities_date FOREIGN KEY (date_id) REFERENCES gold.dim_date(date_id),
     CONSTRAINT uk_activity_id UNIQUE (activity_id)
 );
 
 -- Create indexes for fact_activities
-CREATE INDEX idx_fact_activities_date_id ON fact_activities(date_id);
-CREATE INDEX idx_fact_activities_activity_type_id ON fact_activities(activity_type_id);
-CREATE INDEX idx_fact_activities_start_date ON fact_activities(start_date);
-CREATE INDEX idx_fact_activities_sport_type ON fact_activities(sport_type);
+CREATE INDEX idx_fact_activities_date_id ON gold.fact_activities(date_id);
+CREATE INDEX idx_fact_activities_activity_type_id ON gold.fact_activities(activity_type_id);
+CREATE INDEX idx_fact_activities_start_date ON gold.fact_activities(start_date);
+CREATE INDEX idx_fact_activities_sport_type ON gold.fact_activities(sport_type);
 
 -- Aggregated Fact Table: fact_daily_summary
-CREATE TABLE fact_daily_summary (
+CREATE TABLE gold.fact_daily_summary (
     summary_id BIGSERIAL PRIMARY KEY,
     date_id INTEGER,
     
@@ -258,10 +268,10 @@ CREATE TABLE fact_daily_summary (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
     -- Constraints
-    CONSTRAINT fk_daily_summary_date FOREIGN KEY (date_id) REFERENCES dim_date(date_id),
+    CONSTRAINT fk_daily_summary_date FOREIGN KEY (date_id) REFERENCES gold.dim_date(date_id),
     CONSTRAINT uk_date_summary UNIQUE (date_id)
 );
 
 -- Create indexes for fact_daily_summary
-CREATE INDEX idx_fact_daily_summary_date_id ON fact_daily_summary(date_id);
-CREATE INDEX idx_fact_daily_summary_year_month ON fact_daily_summary(date_id);
+CREATE INDEX idx_fact_daily_summary_date_id ON gold.fact_daily_summary(date_id);
+CREATE INDEX idx_fact_daily_summary_year_month ON gold.fact_daily_summary(date_id);

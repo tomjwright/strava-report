@@ -136,12 +136,12 @@ def run_health_check() -> Dict[str, Any]:
         'database': False,
         'strava_api': False,
         'tables': {
-            'bronze_activities': False,
-            'silver_activities': False,
-            'dim_activity_type': False,
-            'dim_date': False,
-            'fact_activities': False,
-            'fact_daily_summary': False
+            'bronze.bronze_activities': False,
+            'silver.silver_activities': False,
+            'gold.dim_activity_type': False,
+            'gold.dim_date': False,
+            'gold.fact_activities': False,
+            'gold.fact_daily_summary': False
         },
         'overall_status': 'unhealthy'
     }

@@ -241,17 +241,17 @@ async def get_gold_activities(limit: int = 100):
             d.day_name,
             d.month_name,
             d.year
-        FROM fact_activities f
-        LEFT JOIN dim_activity_type at ON f.activity_type_id = at.activity_type_id
-        LEFT JOIN dim_date d ON f.date_id = d.date_id
+        FROM gold.fact_activities f
+        LEFT JOIN gold.dim_activity_type at ON f.activity_type_id = at.activity_type_id
+        LEFT JOIN gold.dim_date d ON f.date_id = d.date_id
         ORDER BY f.start_date DESC
         LIMIT $1
         """
-        
+
         # Since we can't run raw SQL through Supabase client, we'll do it manually
         # Get gold activities
-        gold_result = db.client.table('fact_activities').select('*').order('start_date', desc=True).limit(limit).execute()
-        
+        gold_result = db.client.table('gold.fact_activities').select('*').order('start_date', desc=True).limit(limit).execute()
+
         return {"status": "success", "data": gold_result.data, "count": len(gold_result.data)}
     except Exception as e:
         logger.error(f"Error getting gold activities: {e}")
@@ -266,7 +266,7 @@ async def get_daily_summary(days: int = 30):
             return {"status": "error", "message": "Database not available"}
         
         # Get daily summaries
-        summary_result = db.client.table('fact_daily_summary').select('*').order('date_id', desc=True).limit(days).execute()
+        summary_result = db.client.table('gold.fact_daily_summary').select('*').order('date_id', desc=True).limit(days).execute()
         
         return {"status": "success", "data": summary_result.data, "count": len(summary_result.data)}
     except Exception as e:
