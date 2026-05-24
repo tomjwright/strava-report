@@ -115,9 +115,9 @@ CREATE INDEX idx_dim_date_quarter ON dim_date(quarter);
 CREATE OR REPLACE FUNCTION populate_dim_date(start_date DATE, end_date DATE)
 RETURNS VOID AS $$
 DECLARE
-    current_date DATE := start_date;
+    loop_date DATE := start_date;
 BEGIN
-    WHILE current_date <= end_date LOOP
+    WHILE loop_date <= end_date LOOP
         INSERT INTO dim_date (
             date_id,
             date_actual,
@@ -137,34 +137,34 @@ BEGIN
             is_weekend,
             season
         ) VALUES (
-            EXTRACT(YEAR FROM current_date) * 10000 + 
-            EXTRACT(MONTH FROM current_date) * 100 + 
-            EXTRACT(DAY FROM current_date),
-            current_date,
-            EXTRACT(DOW FROM current_date),
-            TO_CHAR(current_date, 'Day'),
-            EXTRACT(DAY FROM current_date),
-            EXTRACT(DOY FROM current_date),
-            EXTRACT(WEEK FROM current_date),
-            CEIL(EXTRACT(DAY FROM current_date)::FLOAT / 7),
-            EXTRACT(MONTH FROM current_date),
-            TO_CHAR(current_date, 'Month'),
-            TO_CHAR(current_date, 'Mon'),
-            EXTRACT(QUARTER FROM current_date),
-            EXTRACT(YEAR FROM current_date),
-            EXTRACT(YEAR FROM current_date) * 100 + EXTRACT(MONTH FROM current_date),
-            EXTRACT(YEAR FROM current_date) * 10 + EXTRACT(QUARTER FROM current_date),
-            EXTRACT(DOW FROM current_date) IN (0, 6),
+            EXTRACT(YEAR FROM loop_date) * 10000 + 
+            EXTRACT(MONTH FROM loop_date) * 100 + 
+            EXTRACT(DAY FROM loop_date),
+            loop_date,
+            EXTRACT(DOW FROM loop_date),
+            TO_CHAR(loop_date, 'Day'),
+            EXTRACT(DAY FROM loop_date),
+            EXTRACT(DOY FROM loop_date),
+            EXTRACT(WEEK FROM loop_date),
+            CEIL(EXTRACT(DAY FROM loop_date)::FLOAT / 7),
+            EXTRACT(MONTH FROM loop_date),
+            TO_CHAR(loop_date, 'Month'),
+            TO_CHAR(loop_date, 'Mon'),
+            EXTRACT(QUARTER FROM loop_date),
+            EXTRACT(YEAR FROM loop_date),
+            EXTRACT(YEAR FROM loop_date) * 100 + EXTRACT(MONTH FROM loop_date),
+            EXTRACT(YEAR FROM loop_date) * 10 + EXTRACT(QUARTER FROM loop_date),
+            EXTRACT(DOW FROM loop_date) IN (0, 6),
             CASE 
-                WHEN EXTRACT(MONTH FROM current_date) IN (12, 1, 2) THEN 'Winter'
-                WHEN EXTRACT(MONTH FROM current_date) IN (3, 4, 5) THEN 'Spring'
-                WHEN EXTRACT(MONTH FROM current_date) IN (6, 7, 8) THEN 'Summer'
-                WHEN EXTRACT(MONTH FROM current_date) IN (9, 10, 11) THEN 'Fall'
+                WHEN EXTRACT(MONTH FROM loop_date) IN (12, 1, 2) THEN 'Winter'
+                WHEN EXTRACT(MONTH FROM loop_date) IN (3, 4, 5) THEN 'Spring'
+                WHEN EXTRACT(MONTH FROM loop_date) IN (6, 7, 8) THEN 'Summer'
+                WHEN EXTRACT(MONTH FROM loop_date) IN (9, 10, 11) THEN 'Fall'
             END
         )
         ON CONFLICT (date_id) DO NOTHING;
         
-        current_date := current_date + INTERVAL '1 day';
+        loop_date := loop_date + INTERVAL '1 day';
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
