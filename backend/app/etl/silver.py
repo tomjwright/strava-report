@@ -91,7 +91,7 @@ def upsert_silver_activity(activity_id: int) -> Optional[Dict[str, Any]]:
             return None
         
         # Get raw data from bronze layer
-        bronze_result = db.client.table('bronze.bronze_activities').select('*').eq('activity_id', activity_id).execute()
+        bronze_result = db.client.table('bronze_activities').select('*').eq('activity_id', activity_id).execute()
 
         if not bronze_result.data:
             logger.warning(f"Activity {activity_id} not found in bronze layer")
@@ -105,15 +105,15 @@ def upsert_silver_activity(activity_id: int) -> Optional[Dict[str, Any]]:
             return None
 
         # Check if activity already exists in silver layer
-        existing = db.client.table('silver.silver_activities').select('*').eq('activity_id', activity_id).execute()
+        existing = db.client.table('silver_activities').select('*').eq('activity_id', activity_id).execute()
 
         if existing.data:
             # Update existing record
-            result = db.client.table('silver.silver_activities').update(cleaned_data).eq('activity_id', activity_id).execute()
+            result = db.client.table('silver_activities').update(cleaned_data).eq('activity_id', activity_id).execute()
             logger.info(f"Updated activity {activity_id} in silver layer")
         else:
             # Insert new record
-            result = db.client.table('silver.silver_activities').insert(cleaned_data).execute()
+            result = db.client.table('silver_activities').insert(cleaned_data).execute()
             logger.info(f"Inserted activity {activity_id} into silver layer")
             
         return result
@@ -141,7 +141,7 @@ def transform_new_bronze_to_silver(limit: int = 100) -> int:
         
         # Get activities from bronze layer that aren't in silver layer
         # This is a simple approach - in production you'd use a more sophisticated incremental strategy
-        bronze_result = db.client.table('bronze.bronze_activities').select('*').order('ingested_at', desc=True).limit(limit).execute()
+        bronze_result = db.client.table('bronze_activities').select('*').order('ingested_at', desc=True).limit(limit).execute()
         
         if not bronze_result.data:
             logger.info("No activities found in bronze layer")

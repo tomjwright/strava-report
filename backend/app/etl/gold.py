@@ -68,7 +68,7 @@ def get_activity_type_id(activity_type: str) -> Optional[int]:
         Activity type dimension ID or None
     """
     try:
-        result = db.client.table('gold.dim_activity_type').select('activity_type_id').eq('type_name', activity_type).execute()
+        result = db.client.table('dim_activity_type').select('activity_type_id').eq('type_name', activity_type).execute()
         if result.data:
             return result.data[0]['activity_type_id']
         else:
@@ -81,7 +81,7 @@ def get_activity_type_id(activity_type: str) -> Optional[int]:
                 'unit_of_measure': 'km',
                 'description': f'{activity_type} activities'
             }
-            insert_result = db.client.table('gold.dim_activity_type').insert(new_type).execute()
+            insert_result = db.client.table('dim_activity_type').insert(new_type).execute()
             return insert_result.data[0]['activity_type_id'] if insert_result.data else None
             
     except Exception as e:
@@ -109,7 +109,7 @@ def get_date_id(date_str: str) -> Optional[int]:
         date_id = int(date_obj.strftime('%Y%m%d'))
         
         # Check if date dimension exists
-        result = db.client.table('gold.dim_date').select('*').eq('date_id', date_id).execute()
+        result = db.client.table('dim_date').select('*').eq('date_id', date_id).execute()
 
         if not result.data:
             # Create date dimension record if it doesn't exist
@@ -131,7 +131,7 @@ def get_date_id(date_str: str) -> Optional[int]:
                          'Spring' if date_obj.month in [3, 4, 5] else
                          'Summer' if date_obj.month in [6, 7, 8] else 'Fall'
             }
-            db.client.table('gold.dim_date').insert(date_record).execute()
+            db.client.table('dim_date').insert(date_record).execute()
             logger.info(f"Created date dimension for {date_obj}")
             
         return date_id
@@ -156,7 +156,7 @@ def transform_silver_to_gold(activity_id: int) -> Optional[Dict[str, Any]]:
             return None
         
         # Get silver activity data
-        silver_result = db.client.table('silver.silver_activities').select('*').eq('activity_id', activity_id).execute()
+        silver_result = db.client.table('silver_activities').select('*').eq('activity_id', activity_id).execute()
 
         if not silver_result.data:
             logger.warning(f"Activity {activity_id} not found in silver layer")
@@ -220,13 +220,13 @@ def transform_silver_to_gold(activity_id: int) -> Optional[Dict[str, Any]]:
         }
 
         # Upsert to gold layer
-        existing = db.client.table('gold.fact_activities').select('*').eq('activity_id', activity_id).execute()
+        existing = db.client.table('fact_activities').select('*').eq('activity_id', activity_id).execute()
 
         if existing.data:
-            result = db.client.table('gold.fact_activities').update(gold_fact).eq('activity_id', activity_id).execute()
+            result = db.client.table('fact_activities').update(gold_fact).eq('activity_id', activity_id).execute()
             logger.info(f"Updated gold fact for activity {activity_id}")
         else:
-            result = db.client.table('gold.fact_activities').insert(gold_fact).execute()
+            result = db.client.table('fact_activities').insert(gold_fact).execute()
             logger.info(f"Inserted gold fact for activity {activity_id}")
             
         return result
@@ -251,7 +251,7 @@ def update_daily_summary(date_id: int) -> Optional[Dict[str, Any]]:
             return None
         
         # Get all activities for this date
-        activities_result = db.client.table('gold.fact_activities').select('*').eq('date_id', date_id).execute()
+        activities_result = db.client.table('fact_activities').select('*').eq('date_id', date_id).execute()
 
         if not activities_result.data:
             logger.info(f"No activities found for date_id {date_id}")
@@ -299,13 +299,13 @@ def update_daily_summary(date_id: int) -> Optional[Dict[str, Any]]:
         }
 
         # Upsert summary
-        existing = db.client.table('gold.fact_daily_summary').select('*').eq('date_id', date_id).execute()
+        existing = db.client.table('fact_daily_summary').select('*').eq('date_id', date_id).execute()
 
         if existing.data:
-            result = db.client.table('gold.fact_daily_summary').update(summary_record).eq('date_id', date_id).execute()
+            result = db.client.table('fact_daily_summary').update(summary_record).eq('date_id', date_id).execute()
             logger.info(f"Updated daily summary for date_id {date_id}")
         else:
-            result = db.client.table('gold.fact_daily_summary').insert(summary_record).execute()
+            result = db.client.table('fact_daily_summary').insert(summary_record).execute()
             logger.info(f"Inserted daily summary for date_id {date_id}")
             
         return result
@@ -332,7 +332,7 @@ def transform_silver_to_gold_batch(limit: int = 100) -> int:
         logger.info(f"Transforming up to {limit} activities from silver to gold layer")
         
         # Get activities from silver layer
-        silver_result = db.client.table('silver.silver_activities').select('*').order('updated_at', desc=True).limit(limit).execute()
+        silver_result = db.client.table('silver_activities').select('*').order('updated_at', desc=True).limit(limit).execute()
         
         if not silver_result.data:
             logger.info("No activities found in silver layer")

@@ -6,6 +6,15 @@ CREATE SCHEMA IF NOT EXISTS bronze;
 CREATE SCHEMA IF NOT EXISTS silver;
 CREATE SCHEMA IF NOT EXISTS gold;
 
+-- Set search path to include all schemas (allows unqualified table names)
+-- This setting applies to the current session
+SET search_path TO bronze, silver, gold, public;
+
+-- Make search path permanent for the database role
+ALTER ROLE postgres SET search_path TO bronze, silver, gold, public;
+ALTER ROLE anon SET search_path TO bronze, silver, gold, public;
+ALTER ROLE authenticated SET search_path TO bronze, silver, gold, public;
+
 -- Grant permissions (adjust as needed for your security requirements)
 GRANT USAGE ON SCHEMA bronze, silver, gold TO public;
 GRANT ALL ON SCHEMA bronze, silver, gold TO postgres;

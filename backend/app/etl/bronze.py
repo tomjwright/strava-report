@@ -30,7 +30,7 @@ def ingest_activity(activity_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         }
         
         # Insert using Supabase client
-        result = db.client.table('bronze.bronze_activities').insert(bronze_record).execute()
+        result = db.client.table('bronze_activities').insert(bronze_record).execute()
         logger.info(f"Ingested activity {activity_data['id']} into bronze layer")
         return result
         
@@ -54,7 +54,7 @@ def upsert_activity(activity_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             return None
         
         # Check if activity already exists
-        existing = db.client.table('bronze.bronze_activities').select('*').eq('activity_id', activity_data['id']).execute()
+        existing = db.client.table('bronze_activities').select('*').eq('activity_id', activity_data['id']).execute()
 
         bronze_record = {
             'activity_id': activity_data['id'],
@@ -64,12 +64,12 @@ def upsert_activity(activity_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
         if existing.data:
             # Update existing record
-            result = db.client.table('bronze.bronze_activities').update(bronze_record).eq('activity_id', activity_data['id']).execute()
+            result = db.client.table('bronze_activities').update(bronze_record).eq('activity_id', activity_data['id']).execute()
             logger.info(f"Updated activity {activity_data['id']} in bronze layer")
         else:
             # Insert new record
             bronze_record['ingested_at'] = datetime.utcnow().isoformat()
-            result = db.client.table('bronze.bronze_activities').insert(bronze_record).execute()
+            result = db.client.table('bronze_activities').insert(bronze_record).execute()
             logger.info(f"Ingested activity {activity_data['id']} into bronze layer")
             
         return result
@@ -116,7 +116,7 @@ def fetch_and_ingest_recent(
         # If incremental, get the latest activity date from bronze layer
         if incremental and db:
             try:
-                latest = db.client.table('bronze.bronze_activities').select('activity_id').order('ingested_at', desc=True).limit(1).execute()
+                latest = db.client.table('bronze_activities').select('activity_id').order('ingested_at', desc=True).limit(1).execute()
                 if latest.data:
                     # Convert activity_id to timestamp approximation or use stored timestamp
                     latest_activity_id = latest.data[0]['activity_id']
