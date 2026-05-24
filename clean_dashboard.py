@@ -14,23 +14,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Clean, readable configuration (no dark theme issues)
+# Dark theme configuration
 st.markdown("""
 <style>
     .stApp {
-        background-color: #ffffff;
+        background-color: #0f172a;
     }
     .main {
-        background-color: #ffffff;
+        background-color: #0f172a;
     }
     h1, h2, h3 {
-        color: #1f2937;
+        color: #f8fafc;
     }
     .metric-card {
-        background-color: #f3f4f6;
+        background-color: #1e293b;
         border-radius: 8px;
         padding: 16px;
         margin: 8px 0;
+        color: #f8fafc;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #f8fafc;
+    }
+    div[data-testid="stMetricLabel"] {
+        color: #94a3b8;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -96,7 +103,7 @@ def create_activity_type_page(activities, activity_type, color):
     display_cols = ['name', 'distance_km', 'moving_time_minutes', 'start_date_local', 'kudos_count']
     display_df = df[display_cols].copy()
     display_df.columns = ['Activity', 'Distance (km)', 'Time (min)', 'Date', 'Kudos']
-    st.dataframe(display_df, use_container_width=True)
+    st.dataframe(display_df, width='stretch')
     
     # Distance chart
     if len(filtered) > 1:
@@ -106,7 +113,14 @@ def create_activity_type_page(activities, activity_type, color):
                       title=f'{activity_type} Distance Over Time',
                       labels={'start_date_local': 'Date', 'distance_km': 'Distance (km)'},
                       color_discrete_sequence=[color])
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_layout(
+            plot_bgcolor='#1e293b',
+            paper_bgcolor='#1e293b',
+            font=dict(color='#f8fafc'),
+            xaxis=dict(color='#94a3b8'),
+            yaxis=dict(color='#94a3b8')
+        )
+        st.plotly_chart(fig, width='stretch')
 
 def main():
     """Main application."""
@@ -155,13 +169,20 @@ def main():
             # Activity breakdown
             if summary.get('activity_types'):
                 st.subheader("Activity Breakdown")
-                types_df = pd.DataFrame(list(summary['activity_types'].items()), 
+                types_df = pd.DataFrame(list(summary['activity_types'].items()),
                                      columns=['Activity', 'Count'])
-                fig = px.bar(types_df, x='Activity', y='Count', 
+                fig = px.bar(types_df, x='Activity', y='Count',
                             title='Activities by Type',
                             color='Count',
-                            color_continuous_scale='Blues')
-                st.plotly_chart(fig, use_container_width=True)
+                            color_continuous_scale='Viridis')
+                fig.update_layout(
+                    plot_bgcolor='#1e293b',
+                    paper_bgcolor='#1e293b',
+                    font=dict(color='#f8fafc'),
+                    xaxis=dict(color='#94a3b8'),
+                    yaxis=dict(color='#94a3b8')
+                )
+                st.plotly_chart(fig, width='stretch')
         
         # Recent activities
         st.subheader("Recent Activities")
@@ -173,7 +194,7 @@ def main():
             display_cols = ['name', 'type', 'distance_km', 'moving_time_minutes', 'start_date_local', 'kudos_count']
             display_df = df_sorted[display_cols].copy()
             display_df.columns = ['Activity', 'Type', 'Distance (km)', 'Time (min)', 'Date', 'Kudos']
-            st.dataframe(display_df, use_container_width=True)
+            st.dataframe(display_df, width='stretch')
         
         # Distance over time (all activities)
         if activities and len(activities) > 1:
@@ -190,7 +211,14 @@ def main():
             fig = px.bar(daily_counts, x='Date', y='Count',
                         title='Activities Per Day',
                         color_discrete_sequence=['#3B82F6'])
-            st.plotly_chart(fig, use_container_width=True)
+            fig.update_layout(
+                plot_bgcolor='#1e293b',
+                paper_bgcolor='#1e293b',
+                font=dict(color='#f8fafc'),
+                xaxis=dict(color='#94a3b8'),
+                yaxis=dict(color='#94a3b8')
+            )
+            st.plotly_chart(fig, width='stretch')
     
     elif page == "🏃 Running":
         create_activity_type_page(activities, "Run", "#3B82F6")
