@@ -1,191 +1,194 @@
-# Strava Activity Dashboard (Simplified)
+# Strava Activity Dashboard (Next.js + Vercel)
 
-A streamlined Strava activity dashboard using Supabase for database operations. This version bypasses DNS issues by using the Supabase HTTP API instead of direct PostgreSQL connections.
+Modern Strava activity dashboard with Next.js frontend, FastAPI backend, and Supabase database. Deployed on Vercel for optimal performance and developer experience.
 
 ## 🚀 Features
 
-- **Strava API Integration**: Fetch and store activities from Strava
-- **Supabase Database**: Reliable database operations via HTTP API
-- **FastAPI Backend**: Modern Python web framework
-- **Bronze Layer ETL**: Raw data ingestion from Strava
-- **Memory Efficient**: Uses Polars for data processing
+- **Modern Next.js Frontend**: React-based dashboard with dark theme
+- **FastAPI Backend**: Python API with CORS enabled
+- **Supabase Database**: Reliable PostgreSQL database
+- **Strava Integration**: Fetch and store activities automatically
+- **CI/CD Pipeline**: Automated testing and deployment
+- **Vercel Hosting**: Optimized for Next.js applications
+- **Responsive Design**: Works on desktop and mobile
 
 ## 🛠️ Technology Stack
 
-- **Backend**: Python 3.11+, FastAPI, Uvicorn
-- **Database**: Supabase PostgreSQL (via HTTP API)
-- **Data Processing**: Polars (memory efficient)
-- **API Client**: httpx for Strava API
-- **Configuration**: Pydantic Settings
+### Frontend
+- **Next.js 14**: React framework with App Router
+- **TypeScript**: Type-safe development
+- **Tailwind CSS**: Modern utility-first styling
+- **Recharts**: Beautiful chart library
+- **Supabase Client**: Database connectivity
+
+### Backend
+- **Python 3.11+**: Modern Python
+- **FastAPI**: High-performance API framework
+- **Supabase**: Database client
+- **Uvicorn**: ASGI server
+
+### Infrastructure
+- **Vercel**: Frontend hosting and CI/CD
+- **Render/Railway**: Backend hosting (optional)
+- **GitHub Actions**: Automated testing and deployment
 
 ## 🚦 Quick Start
 
 ### Prerequisites
 
 - Python 3.11+
+- Node.js 18+
 - Supabase account (free tier)
 - Strava API credentials
 
-### Setup
+### Frontend Setup
 
-1. **Clone and install**:
 ```bash
-cd strava-report
+cd frontend
+npm install
+cp ../.env.example .env.local
+# Edit .env.local with your Supabase credentials
+npm run dev
+```
+
+Visit [http://localhost:3000](http://localhost:3000)
+
+### Backend Setup
+
+```bash
+# From project root
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env
+# Edit .env with your credentials
+uvicorn simple_backend:app --reload
 ```
 
-2. **Configure environment**:
-```bash
-# .env file should contain:
-STRAVA_CLIENT_ID=your_strava_client_id
-STRAVA_CLIENT_SECRET=your_strava_client_secret
-STRAVA_REFRESH_TOKEN=your_strava_refresh_token
-STRAVA_ACCESS_TOKEN=your_strava_access_token
-STRAVA_WEBHOOK_VERIFY_TOKEN=your_webhook_verify_token
+Backend runs on [http://localhost:8006](http://localhost:8006)
 
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_KEY=your_supabase_service_role_key
+### Database Setup
 
-DATABASE_URL=  # Leave empty to use Supabase client
-```
-
-3. **Create database tables in Supabase**:
-   - Go to https://supabase.com/dashboard
-   - Navigate to your project
-   - Open SQL Editor
-   - Run the SQL to create tables:
+1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
+2. Create a new project
+3. Run this SQL in the SQL Editor:
 
 ```sql
-CREATE TABLE IF NOT EXISTS bronze_activities (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    strava_id INTEGER UNIQUE NOT NULL,
-    raw_data JSONB NOT NULL,
-    ingested_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    processed BOOLEAN DEFAULT FALSE,
-    processed_at TIMESTAMP WITH TIME ZONE
-);
-
-CREATE TABLE IF NOT EXISTS activities (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    strava_id INTEGER UNIQUE NOT NULL,
-    activity_type VARCHAR(50) NOT NULL,
-    sport_type VARCHAR(50) NOT NULL,
+CREATE TABLE IF NOT EXISTS strava_activities (
+    id INTEGER PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    distance FLOAT,
-    moving_time INTEGER,
+    type VARCHAR(50) NOT NULL,
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    start_date_local TIMESTAMP WITH TIME ZONE NOT NULL,
-    -- Add other fields as needed
+    distance FLOAT NOT NULL,
+    moving_time INTEGER NOT NULL,
+    elapsed_time INTEGER NOT NULL,
+    total_elevation_gain FLOAT DEFAULT 0,
+    average_speed FLOAT DEFAULT 0,
+    max_speed FLOAT DEFAULT 0,
+    average_heartrate FLOAT,
+    max_heartrate FLOAT,
+    location_city VARCHAR(255),
+    location_country VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
 
-4. **Run backend**:
-```bash
-cd backend
-python -m app.main
+## 📊 Architecture
+
+```
+┌─────────────────┐         ┌──────────────────┐
+│  Vercel (Frontend) │  ──▶  │  FastAPI Backend  │
+│  - Next.js      │         │  - API Endpoints  │
+│  - React Charts │         │  - CORS Enabled  │
+└─────────────────┘         └──────────────────┘
+                                      │
+                                      ▼
+                              ┌──────────────┐
+                              │  Supabase    │
+                              │  Database    │
+                              └──────────────┘
 ```
 
-Backend runs on http://localhost:8000 with API docs at /docs
+## 🔧 Environment Variables
 
-## 🔧 API Endpoints
-
-- `GET /` - Root endpoint with app info
-- `GET /health` - Health check and database status
-- `GET /api/activities` - List activities (with optional filtering)
-- `POST /api/ingest` - Ingest a sample activity for testing
-- `GET /docs` - Interactive API documentation (Swagger UI)
-
-## 📊 Current Architecture
-
-**Simplified Design**:
-- Direct Supabase HTTP API client (bypasses DNS issues)
-- Bronze layer for raw Strava data
-- No complex ETL pipeline (dbt removed for simplicity)
-- No webhooks (removed for simplicity)
-- No silver/gold layers (removed for simplicity)
-
-## 🧪 Testing the App
-
-```bash
-# Start the server
-cd backend
-python -m app.main
-
-# The app runs on http://localhost:8003
-
-# In another terminal, test the endpoints
-curl http://localhost:8003/health
-curl http://localhost:8003/api/activities
-curl http://localhost:8003/api/bronze-activities
-curl -X POST http://localhost:8003/api/ingest
-curl -X POST "http://localhost:8003/api/fetch-strava?limit=10"
+### Frontend (.env.local)
+```
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_KEY=your_supabase_key
 ```
 
-## 🎯 Demo Mode
+### Backend (.env)
+```
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
+STRAVA_CLIENT_ID=your_strava_client_id
+STRAVA_CLIENT_SECRET=your_strava_client_secret
+STRAVA_REFRESH_TOKEN=your_strava_refresh_token
+```
 
-The app includes a demo mode that automatically falls back to mock data from 2026 onwards if Strava API credentials are invalid. This allows you to test the functionality without needing valid Strava credentials.
+## 🚀 Deployment
 
-The mock data includes:
-- Running activities (5km runs)
-- Cycling activities (15km rides)  
-- Swimming activities (1km swims)
-- Strength training activities
+### Vercel (Frontend)
+1. Connect your GitHub repository to Vercel
+2. Set root directory to `frontend`
+3. Add environment variables
+4. Deploy automatically on push to main/develop
 
-All mock activities are from **January 2026 onwards** as requested.
+### Backend (Render/Railway)
+1. Create a new web service
+2. Connect your GitHub repository
+3. Add environment variables
+4. Deploy with `uvicorn simple_backend:app --host 0.0.0.0 --port $PORT`
 
 ## 📁 Project Structure
 
 ```
 strava-report/
-├── backend/
-│   └── app/
-│       ├── main.py          # FastAPI application
-│       ├── config.py        # Configuration settings
-│       ├── db/
-│       │   ├── database.py  # Database interface
-│       │   └── supabase_adapter.py  # Supabase client
-│       ├── services/
-│       │   └── strava_client.py  # Strava API client
-│       ├── etl/
-│       │   └── bronze.py   # Bronze layer ETL
-│       └── models/
-│           └── activity.py  # Pydantic models
-├── frontend/               # Streamlit dashboard (if configured)
-├── docs/                   # Documentation
-└── requirements.txt        # Python dependencies
+├── frontend/              # Next.js frontend
+│   ├── app/              # App Router pages
+│   ├── components/       # React components
+│   ├── lib/              # Utilities and clients
+│   └── package.json      # Frontend dependencies
+├── simple_backend.py      # FastAPI backend
+├── simple_data_loader.py # Strava data ingestion
+├── auto_loader.py        # Scheduled data loading
+├── tests/                # Test suite
+├── .github/              # CI/CD workflows
+└── requirements.txt      # Python dependencies
 ```
 
-## ⚠️ Why This Simplified Version?
+## 🔄 CI/CD Pipeline
 
-This version was created to address Windows DNS resolution issues with PostgreSQL connections. By using the Supabase HTTP API client instead of direct PostgreSQL connections, we bypass the DNS problems entirely while maintaining full functionality.
+- **develop branch**: Auto-deploy to Vercel preview
+- **main branch**: Auto-deploy to Vercel production
+- **All branches**: Run tests and linting
 
-## 🔄 From Complex to Simple
+## 🧪 Testing
 
-**Removed for simplicity**:
-- dbt SQL transformations (Windows installation issues)
-- Alembic database migrations (not needed with Supabase client)
-- Webhook handling (removed for simplicity)
-- Silver/Gold ETL layers (removed for simplicity)
-- Complex CI/CD pipelines (simplified)
-- Extensive testing (basic functionality only)
+```bash
+# Backend tests
+pytest tests/ -v
 
-**Kept for functionality**:
-- Strava API integration
-- Supabase database operations
-- FastAPI backend
-- Basic ETL pipeline (Bronze layer)
-- Streamlit dashboard framework
+# Frontend build
+cd frontend
+npm run build
+```
 
-## 🎯 Next Steps
+## 📄 Documentation
 
-1. **Create the database tables** in Supabase SQL Editor
-2. **Test the Strava API** by ingesting real activities
-3. **Configure the dashboard** if using Streamlit
-4. **Add features** as needed based on your requirements
+- [Deployment Guide](DEPLOYMENT.md) - Complete deployment instructions
+- [Branch Strategy](BRANCH_STRATEGY.md) - Git workflow and branching
+- [Frontend README](frontend/README.md) - Frontend-specific documentation
+
+## 🎯 Current Status
+
+- ✅ Next.js frontend with dark theme
+- ✅ FastAPI backend with CORS
+- ✅ Supabase database integration
+- ✅ CI/CD pipeline configured
+- ✅ Vercel deployment ready
+- ⏳ Charts implementation pending
+- ⏳ Production deployment pending
 
 ## 📄 License
 

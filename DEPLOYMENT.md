@@ -1,69 +1,131 @@
 # Deployment Guide
 
-## Vercel vs Streamlit Cloud
+## Architecture Overview
 
-**Important Note**: While Vercel is excellent for web apps, Streamlit requires a long-running Python server process, which Vercel's serverless architecture doesn't support natively. 
+This project now uses a modern **Next.js + Vercel** architecture:
 
-**Recommended**: Use **Streamlit Cloud** (free) - it's designed specifically for Streamlit apps and requires minimal configuration.
-
-## Streamlit Cloud Deployment (Recommended)
-
-### Steps:
-1. Go to [share.streamlit.io](https://share.streamlit.io)
-2. Click "New app"
-3. Connect your GitHub repository
-4. Select the repository and branch
-5. Configure:
-   - **Main file**: `clean_dashboard.py`
-   - **Python version**: 3.11
-   - **Requirements file**: `requirements.txt`
-6. Add environment variables (from your `.env` file):
-   - `SUPABASE_URL`
-   - `SUPABASE_KEY`
-   - `STRAVA_CLIENT_ID`
-   - `STRAVA_CLIENT_SECRET`
-7. Click "Deploy"
-
-### Environment Variables for Streamlit Cloud:
 ```
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
-STRAVA_CLIENT_ID=your_strava_client_id
-STRAVA_CLIENT_SECRET=your_strava_client_secret
+┌─────────────────┐         ┌──────────────────┐
+│  Vercel (Frontend) │  ──▶  │  Render/Railway  │
+│  - Next.js      │         │  - FastAPI Backend│
+│  - React Charts │         │  - API Endpoints  │
+└─────────────────┘         └──────────────────┘
+                                      │
+                                      ▼
+                              ┌──────────────┐
+                              │  Supabase    │
+                              │  Database    │
+                              └──────────────┘
 ```
 
-## Alternative: Render (Free Tier)
+## Vercel Deployment (Frontend)
 
-If you prefer Render over Streamlit Cloud:
+### Setup Steps:
 
-1. Create a `render.yaml` file (included)
-2. Go to [render.com](https://render.com)
-3. Connect GitHub repository
-4. Create new "Web Service"
-5. Configure:
+1. **Install Vercel CLI** (optional):
+   ```bash
+   npm install -g vercel
+   ```
+
+2. **Deploy via Vercel Dashboard**:
+   - Go to [vercel.com](https://vercel.com)
+   - Click "New Project"
+   - Import your GitHub repository
+   - Configure:
+     - **Framework Preset**: Next.js
+     - **Root Directory**: `frontend`
+     - **Build Command**: `npm run build`
+     - **Output Directory**: `.next`
+
+3. **Add Environment Variables**:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_KEY=your_supabase_key
+   ```
+
+4. **Deploy**: Click "Deploy"
+
+### Automatic Deployment with CI/CD:
+
+The GitHub Actions workflow automatically deploys to Vercel:
+- **develop branch** → Vercel Preview
+- **main branch** → Vercel Production
+
+Required GitHub Secrets:
+- `VERCEL_TOKEN` (from Vercel account settings)
+- `VERCEL_ORG_ID` (from Vercel project)
+- `VERCEL_PROJECT_ID` (from Vercel project)
+
+## Backend Deployment (FastAPI)
+
+### Option 1: Render (Recommended)
+
+1. Go to [render.com](https://render.com)
+2. Create new "Web Service"
+3. Configure:
    - **Runtime**: Python 3
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `streamlit run clean_dashboard.py --server.port=$PORT --server.address=0.0.0.0`
-6. Add same environment variables
+   - **Start Command**: `uvicorn simple_backend:app --host 0.0.0.0 --port $PORT`
+4. Add environment variables:
+   ```
+   SUPABASE_URL=your_supabase_url
+   SUPABASE_KEY=your_supabase_key
+   STRAVA_CLIENT_ID=your_strava_client_id
+   STRAVA_CLIENT_SECRET=your_strava_client_secret
+   STRAVA_REFRESH_TOKEN=your_strava_refresh_token
+   ```
 
-## Automated Deployment with CI/CD
+### Option 2: Railway
 
-The GitHub Actions workflow is set up for:
-- **develop branch**: Deploy to preview environment
-- **main branch**: Deploy to production environment
+1. Go to [railway.app](https://railway.app)
+2. Create new project
+3. Deploy from GitHub
+4. Add environment variables (same as above)
 
-For Streamlit Cloud, deployments are automatic when you push to connected branches.
+## Local Development
+
+### Frontend (Next.js):
+```bash
+cd frontend
+npm install
+npm run dev
+# Visit http://localhost:3000
+```
+
+### Backend (FastAPI):
+```bash
+pip install -r requirements.txt
+uvicorn simple_backend:app --reload
+# Visit http://localhost:8006
+```
+
+### Environment Setup:
+Copy `.env.example` to `.env` and fill in your credentials:
+```bash
+cp .env.example .env
+# Edit .env with your actual values
+```
 
 ## Current Status
 
-- ✅ CI/CD pipeline configured
-- ✅ Branch strategy (Main + Develop)
-- ✅ Testing infrastructure
-- ⏳ Awaiting your hosting platform choice
+- ✅ Next.js frontend created
+- ✅ Vercel configuration added
+- ✅ CI/CD pipeline updated for Next.js
+- ✅ Backend CORS enabled
+- ✅ Dark theme implemented
+- ⏳ Backend deployment pending
+- ⏳ Vercel project setup pending
 
 ## Next Steps
 
-1. Choose hosting platform (recommend: Streamlit Cloud)
-2. Configure environment variables in hosting platform
-3. Test deployment
-4. Update CI/CD workflow with deployment scripts if needed
+1. Set up Vercel project and connect GitHub repo
+2. Add required environment variables in Vercel
+3. Deploy backend to Render/Railway
+4. Update frontend API URLs if needed
+5. Test the complete application
+
+## Troubleshooting
+
+- **Frontend build fails**: Check Node.js version (requires 18+)
+- **Supabase connection fails**: Verify URL and key in environment variables
+- **CORS errors**: Backend CORS is configured with wildcard for development
