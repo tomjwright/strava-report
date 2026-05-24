@@ -19,7 +19,15 @@ DROP TABLE IF EXISTS gold.dim_activity_type CASCADE;
 -- Drop existing intermediate tables
 DROP TABLE IF EXISTS silver.silver_activities CASCADE;
 DROP TABLE IF EXISTS bronze.bronze_activities CASCADE;
+
+-- Drop redundant tables from previous iterations
 DROP TABLE IF EXISTS public.activities CASCADE;
+DROP TABLE IF EXISTS public.fact_daily_summary CASCADE;
+DROP TABLE IF EXISTS public.fact_activities CASCADE;
+DROP TABLE IF EXISTS public.dim_date CASCADE;
+DROP TABLE IF EXISTS public.dim_activity_type CASCADE;
+DROP TABLE IF EXISTS public.silver_activities CASCADE;
+DROP TABLE IF EXISTS public.bronze_activities CASCADE;
 
 -- Bronze Layer: Raw Strava data
 CREATE TABLE bronze.bronze_activities (
