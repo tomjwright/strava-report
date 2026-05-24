@@ -30,6 +30,9 @@ venv/
 env/
 ENV/
 
+# Old directories (empty, not tracked)
+backend/
+
 # Streamlit (but keep config)
 .streamlit/*
 !.streamlit/config.toml
